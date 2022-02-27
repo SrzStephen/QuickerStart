@@ -140,8 +140,6 @@ Resources:
        IamInstanceProfile: !Ref S3WriteInstanceProfile
        ImageId: !FindInMap ['AMIS', !Ref AWSRegion, 'ImageId']
        InstanceType: !Ref InstanceType
-       #SecurityGroupIds:
-         #- !GetAtt [EgressRule, GroupId]
        NetworkInterfaces:
          - AssociatePublicIpAddress: True
            DeviceIndex: 0
@@ -149,8 +147,6 @@ Resources:
            SubnetId: !Ref PublicSubnet
            GroupSet:
             - !Ref EgressRule
-      # mkdir ~/.pip
-      # vi ~/.pip/aaaa
        UserData:
          Fn::Base64:
           Fn::Sub: |
@@ -197,10 +193,6 @@ Resources:
             --hmp-fp32 ./config/ops_fp32_unet.txt --deep_supervision --batch_size 64 --val_batch_size 64 \ 
             --min_epochs 10 --max_epochs 30
             EOF
-    # TODO https://github.com/HabanaAI/Setup_and_Install/tree/main/installation_scripts
-    # python3 preprocess.py --task 01 --dim 2  --data data/ --results results/
-    # https://raw.githubusercontent.com/HabanaAI/Setup_and_Install/main/installation_scripts/PyTorch/pytorch_installation.sh
-    # curl -s http://server/path/script.sh | bash -s arg1 arg2
 
     DependsOn: # Force this to be the last thing created and first thing deleted to save $
       - EgressRule

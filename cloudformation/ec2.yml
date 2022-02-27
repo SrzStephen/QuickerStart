@@ -1,0 +1,225 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: Creates a basic network
+
+Parameters:
+  AWSRegion:
+    Type: String
+    Default: 'us-east-1'
+    AllowedValues: [ 'us-west-2',  'us-east-1' ]
+
+  ProjectName:
+    Type: String
+    Default: aws-ml-hackathon
+    Description: "Name to make it easier to track everything"
+
+  InstanceType:
+    Type: String
+    Default: dl1.24xlarge
+    Description: Gaudi instance
+    AllowedValues: [ 'dl1.24xlarge' ]
+    ConstraintDescription: This needs to be a Gaudi instance, and currently only dl1.24xlarge is supported.
+
+  RootSize:
+    Type: Number
+    Default: 50
+    Description: "Size of Root volume in GB"
+
+Mappings:
+  Networking:
+    VPC:
+      CIDR: '10.0.0.0/22'
+      PublicSubnet: '10.0.1.0/24' # Just needed for the internet gateway.
+  # I couldn't figure out how to find the AMI of the Gaudi instances
+  # https://leaherb.com/how-to-find-an-aws-marketplace-ami-image-id/ was invaluable.
+  # This is for ubuntu 20.04
+  AMIS:
+    us-east-1:
+      ImageId: ami-092e7d01d03078ccf
+      SupportedZone: us-east-1b
+    us-west-2:
+      ImageId: ami-04c2250752984a276
+      SupportedZone: unknown
+Resources:
+  MyS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: Private
+
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      CidrBlock: !FindInMap [ 'Networking', 'VPC', 'CIDR' ]
+
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref 'VPC'
+      CidrBlock: !FindInMap [ 'Networking', 'VPC', 'PublicSubnet' ]
+      AvailabilityZone: !FindInMap ['AMIS', !Ref AWSRegion, 'SupportedZone']
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+
+  GatewayAttachement:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref 'VPC'
+      InternetGatewayId: !Ref 'InternetGateway'
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref 'VPC'
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: GatewayAttachement
+    Description: 'Send any traffic through the internet gateway'
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: '0.0.0.0/0'
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref PublicRouteTable
+
+  EgressRule:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "Allow all egress"
+      VpcId: !Ref VPC
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+      SecurityGroupIngress:
+        - IpProtocol: TCP
+          CidrIp: 0.0.0.0/0
+          FromPort: 22
+          ToPort: 22
+
+  S3WritableRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: !Join [ '-',[ !Ref ProjectName,'policy' ] ]
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:PutObjectAcl
+                Resource: !GetAtt [ MyS3Bucket,Arn ]
+
+  S3WriteInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Join [ '-', [ !Ref ProjectName,'instanceProfile' ] ]
+      Path: /
+      Roles:
+        - !Ref S3WritableRole
+
+
+  GaudiInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+       IamInstanceProfile: !Ref S3WriteInstanceProfile
+       ImageId: !FindInMap ['AMIS', !Ref AWSRegion, 'ImageId']
+       InstanceType: !Ref InstanceType
+       #SecurityGroupIds:
+         #- !GetAtt [EgressRule, GroupId]
+       NetworkInterfaces:
+         - AssociatePublicIpAddress: True
+           DeviceIndex: 0
+           DeleteOnTermination: True
+           SubnetId: !Ref PublicSubnet
+           GroupSet:
+            - !Ref EgressRule
+      # mkdir ~/.pip
+      # vi ~/.pip/aaaa
+       UserData:
+         Fn::Base64:
+          Fn::Sub: |
+            #!/bin/bash
+            sudo apt update -y
+            sudo apt install git awscli python3-venv python3-wheel gcc libpq-dev curl rsync -y
+            git clone https://github.com/HabanaAI/Model-References.git /dev/shm/Model-References
+            cd /dev/shm/Model-References/PyTorch/computer_vision/segmentation/Unet
+            
+            mkdir /dev/shm/tmp
+            mkdir -p /dev/shm/moved_dirs/openmpi
+            ln -s /dev/shm/moved_dirs/openmpi /usr/local/openmpi
+            mkdir -p /dev/shm/moved_dirs/habanalabs
+            rsync -avzh /usr/lib/habanalabs /dev/shm/moved_dirs/
+            rm -rf /usr/lib/habanalabs
+            ln -s /dev/shm/moved_dirs/habanalabs /usr/lib/habanalabs 
+            
+            mkdir /dev/shm/moved_dirs/.cache
+            rsync -avzh /root/.cache /dev/shm/moved_dirs/
+            rm /root/.cache -rf
+            ln -s /dev/shm/moved_dirs/.cache /root/.cache 
+            mkdir /dev/shm/moved_dirs/.local 
+            ln -s /dev/shm/moved_dirs/.local /root/.local      
+
+            pip3 install wheel
+            export TMPDIR=/dev/shm/tmp
+            wget https://raw.githubusercontent.com/HabanaAI/Setup_and_Install/main/installation_scripts/PyTorch/pytorch_installation.sh
+            sudo chmod u+x pytorch_installation.sh
+            TMPDIR=/dev/shm/tmp ./pytorch_installation.sh
+            python3 -m pip install --user --upgrade pip
+            pip3 install -r requirements.txt
+            mkdir data
+            aws s3 cp s3://msd-for-monai-eu/Task01_BrainTumour.tar data/Task01_BrainTumour.tar --no-sign-request
+            tar -xf data/Task01_BrainTumour.tar -C data/
+            rm data/Task01_BrainTumour.tar
+            
+            pip3 install -r requirements.txt
+            python3 preprocess.py --task 01 --dim 2  --data data/ --results results/
+            mkdir tmpresults
+            python3 main.py --results tmpresults --task 01 --logname res_log --fold 0 --hpus 6 --gpus 0 --data /dev/shm/Model-References/PyTorch/computer_vision/segmentation/Unet/results/01_2D/ --seed 1 --num_workers 8 --affinity disabled --norm instance --dim 2 --optimizer fusedadamw --exec_mode train --learning_rate 0.001 --run_lazy_mode --hmp --hmp-bf16 ./config/ops_bf16_unet.txt --hmp-fp32 ./config/ops_fp32_unet.txt --deep_supervision --batch_size 64 --val_batch_size 64
+            EOF
+    # TODO https://github.com/HabanaAI/Setup_and_Install/tree/main/installation_scripts
+    # python3 preprocess.py --task 01 --dim 2  --data data/ --results results/
+    # https://raw.githubusercontent.com/HabanaAI/Setup_and_Install/main/installation_scripts/PyTorch/pytorch_installation.sh
+    # curl -s http://server/path/script.sh | bash -s arg1 arg2
+
+    DependsOn: # Force this to be the last thing created and first thing deleted to save $
+      - EgressRule
+      - MyS3Bucket
+      - GatewayAttachement
+      - PublicRoute
+
+Outputs:
+  VPC:
+    Description: VPC
+    Value: !Ref VPC
+
+  PublicSubnet:
+    Description: PublicSubnet
+    Value: !Ref PublicSubnet
+
+  InstanceDNSName:
+    Description: Name of instance
+    Value: !GetAtt [GaudiInstance, PublicDnsName]
+
+  InstanceID:
+    Description: Name of instance
+    Value: !Ref GaudiInstance
+
+  S3Bucket:
+    Description: S3 bucket name
+    Value: !Ref MyS3Bucket

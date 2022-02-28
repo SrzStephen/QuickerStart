@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 
-Description: Creates a basic network
+Description: Creates a Ha
 
 Parameters:
   ProjectName:
@@ -14,6 +14,26 @@ Parameters:
     Description: Gaudi instance
     AllowedValues: [ 'dl1.24xlarge' ]
     ConstraintDescription: This needs to be a Gaudi instance, and currently only dl1.24xlarge is supported.
+
+  MinEpoch:
+    Type: Number
+    Default: 1
+    Description: Minimum number of epochs to train for
+    MinValue: 1
+
+  MaxEpoch:
+    Type: Number
+    Default: 2
+    Description: Maximum number of epochs to train for
+    MinValue: 2
+
+  HPUS:
+    Type: Number
+    Default: 8
+    Description: HPUs to use for training
+    MinValue: 1
+    MaxValue: 8
+
 
 Mappings:
   Networking:
@@ -48,7 +68,7 @@ Resources:
     Properties:
       VpcId: !Ref 'VPC'
       CidrBlock: !FindInMap [ 'Networking', 'VPC', 'PublicSubnet' ]
-      AvailabilityZone: !FindInMap ['AMIS', !Ref "AWS::Region", 'SupportedZone']
+      AvailabilityZone: !FindInMap [ 'AMIS', !Ref "AWS::Region", 'SupportedZone' ]
 
   InternetGateway:
     Type: AWS::EC2::InternetGateway
@@ -87,11 +107,6 @@ Resources:
       SecurityGroupEgress:
         - IpProtocol: -1
           CidrIp: 0.0.0.0/0
-      SecurityGroupIngress:
-        - IpProtocol: TCP
-          CidrIp: 0.0.0.0/0
-          FromPort: 22
-          ToPort: 22
 
   S3WritableRole:
     Type: AWS::IAM::Role
@@ -113,7 +128,7 @@ Resources:
                 Action:
                   - s3:PutObject
                   - s3:PutObjectAcl
-                Resource: !Join [ '/', [!GetAtt [ MyS3Bucket, Arn ],'*'] ]
+                Resource: !Join [ '/', [ !GetAtt [ MyS3Bucket, Arn ],'*' ] ]
 
   S3WriteInstanceProfile:
     Type: AWS::IAM::InstanceProfile
@@ -127,22 +142,22 @@ Resources:
   GaudiInstance:
     Type: AWS::EC2::Instance
     Properties:
-       IamInstanceProfile: !Ref S3WriteInstanceProfile
-       ImageId: !FindInMap ['AMIS', !Ref "AWS::Region", 'ImageId']
-       InstanceType: !Ref InstanceType
-       NetworkInterfaces:
-         - AssociatePublicIpAddress: True
-           DeviceIndex: 0
-           DeleteOnTermination: True
-           SubnetId: !Ref PublicSubnet
-           GroupSet:
+      IamInstanceProfile: !Ref S3WriteInstanceProfile
+      ImageId: !FindInMap [ 'AMIS', !Ref "AWS::Region", 'ImageId' ]
+      InstanceType: !Ref InstanceType
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: True
+          DeviceIndex: 0
+          DeleteOnTermination: True
+          SubnetId: !Ref PublicSubnet
+          GroupSet:
             - !Ref EgressRule
-       UserData:
-         Fn::Base64:
+      UserData:
+        Fn::Base64:
           Fn::Sub: |
             #!/bin/bash
             sudo apt update -y
-            sudo apt install git awscli python3-venv python3-wheel gcc libpq-dev curl rsync -y
+            sudo apt install git awscli python3-venv python3-wheel gcc libpq-dev curl rsync libjpeg-dev zlib1g-dev -y
             git clone https://github.com/HabanaAI/Model-References.git /dev/shm/Model-References
             cd /dev/shm/Model-References/PyTorch/computer_vision/segmentation/Unet
             
@@ -176,9 +191,9 @@ Resources:
             pip3 install -r requirements.txt
             python3 preprocess.py --task 01 --dim 2  --data data/ --results results/
             mkdir output_results
-            python3 main.py --results output_results --task 01 --logname res_log --fold 0 --hpus 8 --gpus 0 --data /dev/shm/Model-References/PyTorch/computer_vision/segmentation/Unet/results/01_2d/ --seed 1 --num_workers 12 --affinity disabled --norm instance --dim 2 --optimizer fusedadamw --exec_mode train --learning_rate 0.001 --run_lazy_mode --hmp --hmp-bf16 ./config/ops_bf16_unet.txt --hmp-fp32 ./config/ops_fp32_unet.txt --deep_supervision --batch_size 64 --val_batch_size 64 --min_epochs 8 --max_epochs 30
-            
-            
+            source /root/.bashrc
+            cd /dev/shm/Model-References/PyTorch/computer_vision/segmentation/Unet
+            python3 main.py --results output_results --task 01 --logname res_log --fold 0 --hpus ${HPUS} --gpus 0 --data /dev/shm/Model-References/PyTorch/computer_vision/segmentation/Unet/results/01_2d/ --seed 1 --num_workers 12 --affinity disabled --norm instance --dim 2 --optimizer fusedadamw --exec_mode train --learning_rate 0.001 --run_lazy_mode --hmp --hmp-bf16 ./config/ops_bf16_unet.txt --hmp-fp32 ./config/ops_fp32_unet.txt --deep_supervision --batch_size 64 --val_batch_size 64 --min_epochs ${MinEpoch} --max_epochs ${MaxEpoch}
 
     DependsOn: # Force this to be the last thing created and first thing deleted to save $
       - EgressRule
@@ -197,7 +212,7 @@ Outputs:
 
   InstanceDNSName:
     Description: Name of instance
-    Value: !GetAtt [GaudiInstance, PublicDnsName]
+    Value: !GetAtt [ GaudiInstance, PublicDnsName ]
 
   InstanceID:
     Description: Name of instance

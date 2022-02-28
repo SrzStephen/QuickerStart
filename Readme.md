@@ -1,3 +1,4 @@
+
 ## Inspiration
 
 I wanted to try a different approach for this hackathon. Rather than find some large available dataset, build a model and train it using the [dl1.24xlarge](https://aws.amazon.com/ec2/instance-types/dl1/) instances to come
@@ -14,7 +15,7 @@ and executes a script which trains the model using the Brain Tumor dataset from 
 
 As this script is running as [UserData](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/user-data.html) progress can be monitored with
 ```zsh
-tail -f /var/log/cloud-init-output.log
+tail -f /var/log/cloud-init-output.logz
 ```
 
 ![](docs/diagram.png)
@@ -55,10 +56,7 @@ aws cloudformation create-stack \
 ```
 
 Monitor the stack creation process in the [cloudformation](https://console.aws.amazon.com/cloudformation/home?region=us-east-1#) page or
-monitor the progress in the AWS CLI with
-```zsh
-aws cloudformation describe-stacks
-```
+monitor the progress in the AWS CLI with `aws cloudformation describe-stacks`
 
 Once complete visit the [EC2 instances](https://console.aws.amazon.com/ec2/v2/home?region=us-east-1) page and use 
 Instance Connect to SSH into your instance. In the event that this fails, try again in a few minutes because the instance 
@@ -68,11 +66,16 @@ Once there you can view progress of the installation/training process with `tail
 The trained model and logs can then be found in ```/dev/shm/Model-References/PyTorch/computer_vision/segmentation/Unet/output_results```
 
 You can then upload these to the S3 bucket that was generated with your cloudformation template since the EC2 instance
-has an IamInstanceProfile that allows this. To keep things neat, this bucket will be deleted when the stack is.
-
+has an IamInstanceProfile that allows this. 
 ```zsh
 aws s3api put-object --bucket your-bucket-name --key your-file-name
 ```
+
+Be sure to empty your bucket with `aws s3 rm s3://bucket-name --recursive` 
+if you have added objects to the bucket before deleteting or you'll get a stack deletion failed error. In my experience
+your EC2 instance still gets deleted despite this, although you may want to cofirm by visiting instances in the 
+AWS console for the region you created your bucket in.
+
 # Dataset used
 This uses the [Medical Segmentation Decathlon dataset](https://registry.opendata.aws/msd/) hosted on AWS OpenData. The 
 dataset is best described in the [A large annotaed medical image dataset for the development and evaluation of segmentation algorithms](https://arxiv.org/pdf/1902.09063.pdf) paper.
@@ -100,7 +103,7 @@ Cloudformation and a LOT of destroying the cloudformation stack and recreating i
 
 ## Challenges we ran into
 ### Cloudformation Support
-Because the dl1.24xlarge instaces are so new, there is limited cloudformation support. This lack of cloudformation 
+Because the dl1.24xlarge instances are so new, there is limited cloudformation support. This lack of cloudformation 
 has limited me to only trying to get this working via EC2 as the blockers for other services are:
 * There is currently no sagemaker support for the new dl1.24xlarge instances
 * There is currently no way to enable the correct runtime via ECS in CloudFormation.
@@ -144,5 +147,6 @@ another folder mounted in `/dev/sdm`.
 when I started continuously destroying and recreating instances to try to debug issues and check that my fixes worked.
 * I learnt a bit about where pip actually stores its files and the files it stores, because I'd never thought about that.
 
-## What's next for Untitled
-Wait for additional cloudformation support so that I can create a proper sagemaker pipeline.
+## What's next for EasierSetup
+It'd be worth rewriting some of the code for the userdata into a single makefile so that then you could start selecting
+different frameworks and different models using just an AWS Cloudformation parameter.

@@ -10,6 +10,9 @@ Based on these difficulties I faced, I decided to set my self a challenge of set
 the hopes that people can build upon a working cloudformation template for their own training, avoiding them having to same the same problems that I found during the process.
 
 ## What it does
+![Stack setup](docs/aws_stack_create.png)
+
+
 This cloudformation template sets up all the resources required to train the [Pytorch Unet](https://github.com/HabanaAI/Model-References/tree/master/PyTorch/computer_vision/segmentation/Unet)
 and executes a script which trains the model using the Brain Tumor dataset from the [Medical Segmentation Decathlon](https://registry.opendata.aws/msd/).
 

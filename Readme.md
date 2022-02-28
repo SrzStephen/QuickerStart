@@ -16,6 +16,7 @@ As this script is running as [UserData](https://docs.aws.amazon.com/AWSEC2/lates
 ```zsh
 tail -f /var/log/cloud-init-output.log
 ```
+
 ![](docs/diagram.png)
 
 This training script uses all 8 Gaudi HPUs
@@ -24,7 +25,27 @@ This training script uses all 8 Gaudi HPUs
 
 ## How to use
 ### WARNING: These instances are expensive! Make sure to delete them after you are done!
-To use this, install the [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html),
+
+If you haven't already you will need to raise a [service request](https://console.aws.amazon.com/servicequotas/home/services/ec2/quotas)
+for an increase in `Running On-Demand DL instances` to a value of 96 to run a single `dl1.24xlarge` instance for the 
+region that you want to launch this in (Currently only `us-east-1` and `us-west2` are supported.)
+![Quota screen](docs/quota.png)
+
+If you cloudformation template gives you the error `You have requested more vCPU capacity than your current vCPU limit of 0 allows for the instance bucket that the specified instance type belongs to. ` then this hasn't been done properly.
+
+
+
+Once you're able to request `dl1.24xlarge` instances, you can then launch the stack either with the buttons below or manually via the AWS CLI.
+
+Launch Stack in US East 1
+
+[![Launch Stack](https://cdn.rawgit.com/buildkite/cloudformation-launch-stack-button-svg/master/launch-stack.svg)](https://console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/new?stackName=aws-habana-gaudi-train&templateURL=https://stephen-public-bucket-no-delete.s3.amazonaws.com/ec2.yml)
+
+Launch Stack in US West 2
+
+[![Launch Stack](https://cdn.rawgit.com/buildkite/cloudformation-launch-stack-button-svg/master/launch-stack.svg)](https://console.aws.amazon.com/cloudformation/home?region=us-west-2#/stacks/new?stackName=aws-habana-gaudi-train&templateURL=https://stephen-public-bucket-no-delete.s3.amazonaws.com/ec2.yml)
+
+Or install the [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html),
 switch your aws region to `aws-east-1` or `aws-west-2` and run
 ```zsh
 aws cloudformation create-stack \
@@ -36,7 +57,7 @@ aws cloudformation create-stack \
 Monitor the stack creation process in the [cloudformation](https://console.aws.amazon.com/cloudformation/home?region=us-east-1#) page or
 monitor the progress in the AWS CLI with
 ```zsh
-COMMAND
+aws cloudformation describe-stacks
 ```
 
 Once complete visit the [EC2 instances](https://console.aws.amazon.com/ec2/v2/home?region=us-east-1) page and use 
@@ -48,6 +69,10 @@ The trained model and logs can then be found in ```/dev/shm/Model-References/PyT
 
 You can then upload these to the S3 bucket that was generated with your cloudformation template since the EC2 instance
 has an IamInstanceProfile that allows this. To keep things neat, this bucket will be deleted when the stack is.
+
+```zsh
+aws s3api put-object --bucket your-bucket-name --key your-file-name
+```
 # Dataset used
 This uses the [Medical Segmentation Decathlon dataset](https://registry.opendata.aws/msd/) hosted on AWS OpenData. The 
 dataset is best described in the [A large annotaed medical image dataset for the development and evaluation of segmentation algorithms](https://arxiv.org/pdf/1902.09063.pdf) paper.
@@ -59,6 +84,8 @@ patients diagnosed with glioblastoma or lower-grade glioma.
 This image was created by loading the `BRATS_001.nii` data into [3D Slicer](https://download.slicer.org/).
 
 To speed up training time, I'm running it in 2D mode, which takes each slice independently rather than trying to predict voxel space.
+
+
 ![2D Unlabled Brain Image](docs/2d_brain_white.png)
 
 Unlabelled Image
@@ -118,4 +145,4 @@ when I started continuously destroying and recreating instances to try to debug 
 * I learnt a bit about where pip actually stores its files and the files it stores, because I'd never thought about that.
 
 ## What's next for Untitled
-Wait for additional cloudformation support so I can create a proper sagemaker pipeline.
+Wait for additional cloudformation support so that I can create a proper sagemaker pipeline.

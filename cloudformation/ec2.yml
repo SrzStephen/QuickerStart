@@ -3,11 +3,6 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: Creates a basic network
 
 Parameters:
-  AWSRegion:
-    Type: String
-    Default: 'us-east-1'
-    AllowedValues: [ 'us-west-2',  'us-east-1' ]
-
   ProjectName:
     Type: String
     Default: aws-ml-hackathon
@@ -20,11 +15,6 @@ Parameters:
     AllowedValues: [ 'dl1.24xlarge' ]
     ConstraintDescription: This needs to be a Gaudi instance, and currently only dl1.24xlarge is supported.
 
-  RootSize:
-    Type: Number
-    Default: 50
-    Description: "Size of Root volume in GB"
-
 Mappings:
   Networking:
     VPC:
@@ -36,10 +26,10 @@ Mappings:
   AMIS:
     us-east-1:
       ImageId: ami-092e7d01d03078ccf
-      SupportedZone: us-east-1b
+      SupportedZone: us-east-1b # Only specific zones are supported, this moves you to a supported zone
     us-west-2:
       ImageId: ami-04c2250752984a276
-      SupportedZone: unknown
+      SupportedZone: us-west-2a # Only specific zones are supported, this moves you to a supported zone
 Resources:
   MyS3Bucket:
     Type: AWS::S3::Bucket
@@ -58,7 +48,7 @@ Resources:
     Properties:
       VpcId: !Ref 'VPC'
       CidrBlock: !FindInMap [ 'Networking', 'VPC', 'PublicSubnet' ]
-      AvailabilityZone: !FindInMap ['AMIS', !Ref AWSRegion, 'SupportedZone']
+      AvailabilityZone: !FindInMap ['AMIS', !Ref "AWS::Region", 'SupportedZone']
 
   InternetGateway:
     Type: AWS::EC2::InternetGateway
@@ -123,7 +113,7 @@ Resources:
                 Action:
                   - s3:PutObject
                   - s3:PutObjectAcl
-                Resource: !GetAtt [ MyS3Bucket,Arn ]
+                Resource: !Join [ '/', [!GetAtt [ MyS3Bucket, Arn ],'*'] ]
 
   S3WriteInstanceProfile:
     Type: AWS::IAM::InstanceProfile
@@ -138,7 +128,7 @@ Resources:
     Type: AWS::EC2::Instance
     Properties:
        IamInstanceProfile: !Ref S3WriteInstanceProfile
-       ImageId: !FindInMap ['AMIS', !Ref AWSRegion, 'ImageId']
+       ImageId: !FindInMap ['AMIS', !Ref "AWS::Region", 'ImageId']
        InstanceType: !Ref InstanceType
        NetworkInterfaces:
          - AssociatePublicIpAddress: True
@@ -186,13 +176,9 @@ Resources:
             pip3 install -r requirements.txt
             python3 preprocess.py --task 01 --dim 2  --data data/ --results results/
             mkdir output_results
-            python3 main.py --results output_results --task 01 --logname res_log --fold 0 --hpus 8 --gpus 0 \
-            --data /dev/shm/Model-References/PyTorch/computer_vision/segmentation/Unet/results/01_2d/ --seed 1 \
-            --num_workers 12 --affinity disabled --norm instance --dim 2 --optimizer fusedadamw --exec_mode train \
-            --learning_rate 0.001 --run_lazy_mode --hmp --hmp-bf16 ./config/ops_bf16_unet.txt \
-            --hmp-fp32 ./config/ops_fp32_unet.txt --deep_supervision --batch_size 64 --val_batch_size 64 \ 
-            --min_epochs 10 --max_epochs 30
-            EOF
+            python3 main.py --results output_results --task 01 --logname res_log --fold 0 --hpus 8 --gpus 0 --data /dev/shm/Model-References/PyTorch/computer_vision/segmentation/Unet/results/01_2d/ --seed 1 --num_workers 12 --affinity disabled --norm instance --dim 2 --optimizer fusedadamw --exec_mode train --learning_rate 0.001 --run_lazy_mode --hmp --hmp-bf16 ./config/ops_bf16_unet.txt --hmp-fp32 ./config/ops_fp32_unet.txt --deep_supervision --batch_size 64 --val_batch_size 64 --min_epochs 8 --max_epochs 30
+            
+            
 
     DependsOn: # Force this to be the last thing created and first thing deleted to save $
       - EgressRule

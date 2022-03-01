@@ -74,15 +74,6 @@ will show as online before you can access it.
 Once there you can view progress of the installation/training process with `tail -f /var/log/cloud-init-output.log`
 The trained model and logs can then be found in ```/dev/shm/Model-References/PyTorch/computer_vision/segmentation/Unet/output_results```
 
-I have noticed that sometimes training fails early on with `Expected status == synStatus::synSuccess to be true, but got false`, 
-this normally resolves itself if you log back in and restart the training job with
-```
-sudo su
-cd /dev/shm/Model-References/PyTorch/computer_vision/segmentation/Unet
-python3 main.py --results output_results --task 01 --logname res_log --fold 0 --hpus 8 --gpus 0 --data /dev/shm/Model-References/PyTorch/computer_vision/segmentation/Unet/results/01_2d/ --seed 1 --num_workers 12 --affinity disabled --norm instance --dim 2 --optimizer fusedadamw --exec_mode train --learning_rate 0.001 --run_lazy_mode --hmp --hmp-bf16 ./config/ops_bf16_unet.txt --hmp-fp32 ./config/ops_fp32_unet.txt --deep_supervision --batch_size 64 --val_batch_size 64 --min_epochs 1 --max_epochs 2
-```
-Replacing the `--hpus`, `--min_epochs`, `--max_epochs` flags with your desired values
-
 You can then upload these to the S3 bucket that was generated with your cloudformation template since the EC2 instance
 has an IamInstanceProfile that allows this. 
 ```zsh

@@ -207,8 +207,8 @@ Resources:
             export PATH=/usr/local/openmpi/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin
             printenv
             python3 main.py --results output_results --task 01 --logname res_log --fold 0 --hpus ${HPUS} --gpus 0 --data /dev/shm/Model-References/PyTorch/computer_vision/segmentation/Unet/results/01_2d/ --seed 1 --num_workers 12 --affinity disabled --norm instance --dim 2 --optimizer fusedadamw --exec_mode train --learning_rate 0.001 --run_lazy_mode --hmp --hmp-bf16 ./config/ops_bf16_unet.txt --hmp-fp32 ./config/ops_fp32_unet.txt --deep_supervision --batch_size 64 --val_batch_size 64 --min_epochs ${MinEpoch} --max_epochs ${MaxEpoch}
-    # Note, the /bin/bash --login ubuntu thing is needed for the profile to load properly.
-    # It's a bit hacky but it works.
+# A lot of these exports at the end are needed because of the way the non interactive session that UserData launches from works
+# Also I'm unable to do the usual ${} because everything is in a FN::Sub so it'll try to subsitute it out, hence manual path.
 
 
     DependsOn: # Force this to be the last thing created and first thing deleted to save $

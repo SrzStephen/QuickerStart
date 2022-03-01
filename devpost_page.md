@@ -157,17 +157,12 @@ this was to use the `TMPDIR` environment variable to set pips tmp location to so
 another folder mounted in `/dev/sdm`.
 * To make sure I don't get any more problems, I just symlinked `openmpi` and `habanalabs` directories since they were large.
 
-### /etc/profile
-It took me a while to realise why my UserData could never run the code, but logging in manually did.
+### UserData and Environment Variables
+Turns out UserData doesn't load the variables from /etc/profile.d/habanalab.sh which caused some issues that were
+VERY hard to track down because everything worked fine when the train command was run manually. 
+You can see in the userdata where I started throwing things at the wall.
 
-The answer to this was `/etc/profile`. the UserData doesn't seem to trigger it for some reason.
-
-```zsh
-ubuntu@ip-10-0-1-155:~$ ls /etc/profile.d/
-01-locale-fix.sh           Z99-cloud-locale-test.sh   apps-bin-path.sh           cedilla-portuguese.sh      gawk.sh                    
-Z97-byobu.sh               Z99-cloudinit-warnings.sh  bash_completion.sh         gawk.csh                   habanalabs.sh              
-```
-
+I ended up just manually exporting the required variables, it doesn't look the prettiest but it works
 
 ## Accomplishments that I'm proud of / What we learned
 * I was pretty happy that I'd managed to get this working, I haven't done a huge amount of cloudformation before.
@@ -176,8 +171,9 @@ when I started continuously destroying and recreating instances to try to debug 
 * I learnt a bit about where pip actually stores its files and the files it stores, because I'd never thought about that.
 
 ## What's next for Quick(er) Start
+
 It'd be worth rewriting some of the code for the userdata into a single makefile so that then you could start selecting
 different frameworks and different models using just an AWS Cloudformation parameter.
 
-
-There's some gross last minute stuff (all the exports) that I'd want to refactor out.
+There's some last minute gross things in the UserData that could be cleaned up, you'll see it pretty obviously if you 
+see the exports.

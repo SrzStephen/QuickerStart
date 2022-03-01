@@ -1,3 +1,6 @@
+#Video
+[Link to Video](https://youtu.be/71cSlt1X8jk)
+
 
 ## Inspiration
 
@@ -68,6 +71,16 @@ will show as online before you can access it.
 Once there you can view progress of the installation/training process with `tail -f /var/log/cloud-init-output.log`
 The trained model and logs can then be found in ```/dev/shm/Model-References/PyTorch/computer_vision/segmentation/Unet/output_results```
 
+
+I have noticed that sometimes training fails early on with `Expected status == synStatus::synSuccess to be true, but got false`, 
+this normally resolves itself if you log back in and restart the training job with
+```
+sudo su
+cd /dev/shm/Model-References/PyTorch/computer_vision/segmentation/Unet
+python3 main.py --results output_results --task 01 --logname res_log --fold 0 --hpus 8 --gpus 0 --data /dev/shm/Model-References/PyTorch/computer_vision/segmentation/Unet/results/01_2d/ --seed 1 --num_workers 12 --affinity disabled --norm instance --dim 2 --optimizer fusedadamw --exec_mode train --learning_rate 0.001 --run_lazy_mode --hmp --hmp-bf16 ./config/ops_bf16_unet.txt --hmp-fp32 ./config/ops_fp32_unet.txt --deep_supervision --batch_size 64 --val_batch_size 64 --min_epochs 1 --max_epochs 2
+```
+Replacing the `--hpus`, `--min_epochs`, '`--max_epochs`' flags with your desired values
+
 You can then upload these to the S3 bucket that was generated with your cloudformation template since the EC2 instance
 has an IamInstanceProfile that allows this. 
 ```zsh
@@ -101,10 +114,10 @@ Unlabelled Image
 
 Labeled Image
 
-## How we built it
+## How I built it
 Cloudformation and a LOT of destroying the cloudformation stack and recreating it.
 
-## Challenges we ran into
+## Challenges I ran into
 ### Cloudformation Support
 Because the dl1.24xlarge instances are so new, there is limited cloudformation support. This lack of cloudformation 
 has limited me to only trying to get this working via EC2 as the blockers for other services are:
@@ -144,7 +157,7 @@ another folder mounted in `/dev/sdm`.
 
 
 
-## Accomplishments that we're proud of / What we learned
+## Accomplishments that I'm proud of / What we learned
 * I was pretty happy that I'd managed to get this working, I haven't done a huge amount of cloudformation before.
 * I've never cloudformationed an EC2 instance before, and I became really glad I did when I kept destroying the instance 
 when I started continuously destroying and recreating instances to try to debug issues and check that my fixes worked.

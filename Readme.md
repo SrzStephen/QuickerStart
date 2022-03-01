@@ -13,8 +13,11 @@ Based on these difficulties I faced, I decided to set my self a challenge of set
 the hopes that people can build upon a working cloudformation template for their own training, avoiding them having to same the same problems that I found during the process.
 
 ## What it does
-![Stack setup](docs/aws_stack_create.png)
+![Architecture diagram](docs/arch.png)
+Architecture of cloudformation template.
 
+![Stack setup](docs/aws_stack_create.png)
+Stack creation screen.
 
 This cloudformation template sets up all the resources required to train the [Pytorch Unet](https://github.com/HabanaAI/Model-References/tree/master/PyTorch/computer_vision/segmentation/Unet)
 and executes a script which trains the model using the Brain Tumor dataset from the [Medical Segmentation Decathlon](https://registry.opendata.aws/msd/).
@@ -24,7 +27,7 @@ As this script is running as [UserData](https://docs.aws.amazon.com/AWSEC2/lates
 tail -f /var/log/cloud-init-output.logz
 ```
 
-![](docs/diagram.png)
+
 
 This training script uses all 8 Gaudi HPUs
 ![Gaudi multiple HPUs in use](docs/hmi-out.png)
@@ -71,7 +74,6 @@ will show as online before you can access it.
 Once there you can view progress of the installation/training process with `tail -f /var/log/cloud-init-output.log`
 The trained model and logs can then be found in ```/dev/shm/Model-References/PyTorch/computer_vision/segmentation/Unet/output_results```
 
-
 I have noticed that sometimes training fails early on with `Expected status == synStatus::synSuccess to be true, but got false`, 
 this normally resolves itself if you log back in and restart the training job with
 ```
@@ -79,7 +81,7 @@ sudo su
 cd /dev/shm/Model-References/PyTorch/computer_vision/segmentation/Unet
 python3 main.py --results output_results --task 01 --logname res_log --fold 0 --hpus 8 --gpus 0 --data /dev/shm/Model-References/PyTorch/computer_vision/segmentation/Unet/results/01_2d/ --seed 1 --num_workers 12 --affinity disabled --norm instance --dim 2 --optimizer fusedadamw --exec_mode train --learning_rate 0.001 --run_lazy_mode --hmp --hmp-bf16 ./config/ops_bf16_unet.txt --hmp-fp32 ./config/ops_fp32_unet.txt --deep_supervision --batch_size 64 --val_batch_size 64 --min_epochs 1 --max_epochs 2
 ```
-Replacing the `--hpus`, `--min_epochs`, '`--max_epochs`' flags with your desired values
+Replacing the `--hpus`, `--min_epochs`, `--max_epochs` flags with your desired values
 
 You can then upload these to the S3 bucket that was generated with your cloudformation template since the EC2 instance
 has an IamInstanceProfile that allows this. 
@@ -155,6 +157,16 @@ this was to use the `TMPDIR` environment variable to set pips tmp location to so
 another folder mounted in `/dev/sdm`.
 * To make sure I don't get any more problems, I just symlinked `openmpi` and `habanalabs` directories since they were large.
 
+### /etc/profile
+It took me a while to realise why my UserData could never run the code, but logging in manually did.
+
+The answer to this was `/etc/profile`. the UserData doesn't seem to trigger it for some reason.
+
+```zsh
+ubuntu@ip-10-0-1-155:~$ ls /etc/profile.d/
+01-locale-fix.sh           Z99-cloud-locale-test.sh   apps-bin-path.sh           cedilla-portuguese.sh      gawk.sh                    
+Z97-byobu.sh               Z99-cloudinit-warnings.sh  bash_completion.sh         gawk.csh                   habanalabs.sh              
+```
 
 
 ## Accomplishments that I'm proud of / What we learned
@@ -163,6 +175,6 @@ another folder mounted in `/dev/sdm`.
 when I started continuously destroying and recreating instances to try to debug issues and check that my fixes worked.
 * I learnt a bit about where pip actually stores its files and the files it stores, because I'd never thought about that.
 
-## What's next for EasierSetup
+## What's next for Quick(er) Start
 It'd be worth rewriting some of the code for the userdata into a single makefile so that then you could start selecting
 different frameworks and different models using just an AWS Cloudformation parameter.

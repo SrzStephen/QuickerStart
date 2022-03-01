@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 
-Description: Creates a Ha
+Description: Creates an instance to train a pytorch model on the Habana dl1.24xlarge instance.
 
 Parameters:
   ProjectName:
@@ -191,13 +191,17 @@ Resources:
             aws s3 cp s3://msd-for-monai-eu/Task01_BrainTumour.tar data/Task01_BrainTumour.tar --no-sign-request
             tar -xf data/Task01_BrainTumour.tar -C data/
             rm data/Task01_BrainTumour.tar
-            
             pip3 install -r requirements.txt
             python3 preprocess.py --task 01 --dim 2  --data data/ --results results/
             mkdir output_results
-            source /root/.bashrc
-            /dev/shm/Model-References/PyTorch/computer_vision/segmentation/Unet
+            
+            /bin/bash --login ubuntu
+            sudo su
+            cd /dev/shm/Model-References/PyTorch/computer_vision/segmentation/Unet
             python3 main.py --results output_results --task 01 --logname res_log --fold 0 --hpus ${HPUS} --gpus 0 --data /dev/shm/Model-References/PyTorch/computer_vision/segmentation/Unet/results/01_2d/ --seed 1 --num_workers 12 --affinity disabled --norm instance --dim 2 --optimizer fusedadamw --exec_mode train --learning_rate 0.001 --run_lazy_mode --hmp --hmp-bf16 ./config/ops_bf16_unet.txt --hmp-fp32 ./config/ops_fp32_unet.txt --deep_supervision --batch_size 64 --val_batch_size 64 --min_epochs ${MinEpoch} --max_epochs ${MaxEpoch}
+    # Note, the /bin/bash --login ubuntu thing is needed for the profile to load properly.
+    # It's a bit hacky but it works.
+
 
     DependsOn: # Force this to be the last thing created and first thing deleted to save $
       - EgressRule

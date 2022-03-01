@@ -24,7 +24,7 @@ and executes a script which trains the model using the Brain Tumor dataset from 
 
 As this script is running as [UserData](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/user-data.html) progress can be monitored with
 ```zsh
-tail -f /var/log/cloud-init-output.logz
+tail -f /var/log/cloud-init-output.log
 ```
 
 

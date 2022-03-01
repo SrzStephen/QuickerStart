@@ -24,7 +24,7 @@ and executes a script which trains the model using the Brain Tumor dataset from 
 
 As this script is running as [UserData](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/user-data.html) progress can be monitored with
 ```zsh
-tail -f /var/log/cloud-init-output.logz
+tail -f /var/log/cloud-init-output.log
 ```
 
 
@@ -47,14 +47,15 @@ If you cloudformation template gives you the error `You have requested more vCPU
 
 Once you're able to request `dl1.24xlarge` instances, you can then launch the stack either with the buttons below or manually via the AWS CLI.
 
-Launch Stack in US East 1
+# Launch Stack in US East 1
 
 [![Launch Stack](https://cdn.rawgit.com/buildkite/cloudformation-launch-stack-button-svg/master/launch-stack.svg)](https://console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/new?stackName=aws-habana-gaudi-train&templateURL=https://stephen-public-bucket-no-delete.s3.amazonaws.com/ec2.yml)
 
-Launch Stack in US West 2
+# Launch Stack in US West 2
 
 [![Launch Stack](https://cdn.rawgit.com/buildkite/cloudformation-launch-stack-button-svg/master/launch-stack.svg)](https://console.aws.amazon.com/cloudformation/home?region=us-west-2#/stacks/new?stackName=aws-habana-gaudi-train&templateURL=https://stephen-public-bucket-no-delete.s3.amazonaws.com/ec2.yml)
 
+# Or run with the AWS CLI
 Or install the [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html),
 switch your aws region to `aws-east-1` or `aws-west-2` and run
 ```zsh
